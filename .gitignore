@@ -1,0 +1,16 @@
+venv/
+__pycache__/
+
+# Data
+data/
+*.csv
+
+# Models
+*.pkl
+backend/models/
+
+# MLflow
+mlruns/
+
+# Logs
+*.log

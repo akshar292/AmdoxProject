@@ -1,0 +1,10 @@
+replicaCount: 2
+
+image:
+  repository: neuralretail-fastapi
+  tag: latest
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
