@@ -2,108 +2,73 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import io
 
-st.title("👥 Customer Intelligence & Churn Module")
+st.set_page_config(layout="wide")
 
-# -------------------------
-# LOAD DATA (replace with model output later)
-# -------------------------
-@st.cache_data
-def load_data():
-    df = pd.read_csv("data/processed/feature_store.csv")
-    return df
+# ---------- CSS ----------
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #e2e8f0;
+}
+.card {
+    background: rgba(255,255,255,0.05);
+    padding: 20px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+}
+h1,h2,h3 { color: white; }
+</style>
+""", unsafe_allow_html=True)
 
-df = load_data()
+def card(content):
+    st.markdown(f"<div class='card'>{content}</div>", unsafe_allow_html=True)
 
-# Fake churn score (replace with XGBoost output)
-df["churn_risk"] = np.random.rand(len(df))
-df["risk_decile"] = pd.qcut(df["churn_risk"], 10, labels=False)
+# ---------- TITLE ----------
+st.title("👥 Customer Intelligence")
 
-# -------------------------
-# CHURN HEATMAP
-# -------------------------
-st.subheader("🔥 Churn Risk Heatmap (Segment × Risk)")
+# ---------- DATA ----------
+df = pd.DataFrame({
+    "customer": range(1, 100),
+    "churn_risk": np.random.rand(99)
+})
 
-heatmap = pd.crosstab(df["risk_decile"], df["visitorid"] % 5)
+# ---------- KPI ----------
+c1, c2, c3 = st.columns(3)
+c1.metric("Customers", "45K")
+c2.metric("VIP", "1.2K")
+c3.metric("Churn Risk", "8%")
 
-fig = px.imshow(
-    heatmap,
-    labels=dict(x="Segment", y="Risk Decile", color="Count"),
-    title="Churn Risk Distribution"
-)
+# ---------- SEGMENT ----------
+segments = pd.DataFrame({
+    "segment": ["VIP", "Regular", "At Risk", "New"],
+    "value": [1200, 5400, 900, 3200]
+})
+
+card("<h3>📊 Customer Segments</h3>")
+
+fig = px.pie(segments, names="segment", values="value")
+fig.update_layout(template="plotly_dark")
 
 st.plotly_chart(fig, use_container_width=True)
 
-# -------------------------
-# CUSTOMER 360 VIEW
-# -------------------------
+# ---------- CUSTOMER VIEW ----------
 st.subheader("🧠 Customer 360 View")
 
-customer_id = st.selectbox("Select Customer", df["visitorid"].unique())
+cid = st.selectbox("Select Customer", df["customer"])
 
-cust = df[df["visitorid"] == customer_id].head(1)
+risk = df[df["customer"] == cid]["churn_risk"].values[0]
 
-st.metric("Churn Risk", f"{cust['churn_risk'].values[0]:.2f}")
+st.metric("Churn Risk", f"{risk:.2f}")
 
-st.write("📦 Customer Data")
-st.dataframe(cust)
-
-# -------------------------
-# RETENTION ACTION ENGINE
-# -------------------------
-st.subheader("📢 Retention Action Board")
-
-def action_plan(risk):
-    if risk > 0.7:
-        return "🚨 High Risk: Offer discount + call support team"
-    elif risk > 0.4:
-        return "⚠️ Medium Risk: Send personalized email campaign"
+# ---------- ACTION ----------
+def action(r):
+    if r > 0.7:
+        return "🚨 High Risk"
+    elif r > 0.4:
+        return "⚠️ Medium Risk"
     else:
-        return "✅ Low Risk: Standard engagement"
+        return "✅ Safe"
 
-df["action"] = df["churn_risk"].apply(action_plan)
-
-st.dataframe(df[["visitorid", "churn_risk", "action"]].head(10))
-
-# -------------------------
-# SEGMENT COMPARISON (RFM STYLE)
-# -------------------------
-st.subheader("📊 Segment Comparison Radar")
-
-rfm_demo = pd.DataFrame({
-    "segment": ["VIP", "Regular", "At Risk"],
-    "recency": [80, 50, 20],
-    "frequency": [90, 40, 20],
-    "monetary": [95, 60, 25]
-})
-
-fig = px.line_polar(
-    rfm_demo,
-    r="recency",
-    theta="segment",
-    line_close=True
-)
-
-st.plotly_chart(fig)
-
-# -------------------------
-# CAMPAIGN EXPORT
-# -------------------------
-st.subheader("📦 Campaign Builder")
-
-selected_risk = st.slider("Select Risk Threshold", 0.0, 1.0, 0.6)
-
-campaign_df = df[df["churn_risk"] > selected_risk]
-
-st.write(f"Selected Customers: {len(campaign_df)}")
-
-buffer = io.StringIO()
-campaign_df.to_csv(buffer, index=False)
-
-st.download_button(
-    "⬇️ Download CRM Campaign CSV",
-    buffer.getvalue(),
-    file_name="crm_campaign.csv",
-    mime="text/csv"
-)
+card(f"<h3>🤖 Action</h3><p>{action(risk)}</p>")

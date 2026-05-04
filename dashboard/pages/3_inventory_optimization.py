@@ -1,124 +1,58 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.express as px
-import io
 
-st.title("📦 Inventory Optimization Module")
+st.set_page_config(layout="wide")
 
-# -----------------------------
-# LOAD DATA
-# -----------------------------
-@st.cache_data
-def load_data():
-    return pd.read_csv("data/processed/feature_store.csv")
+# ---------- CSS ----------
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #e2e8f0;
+}
+.card {
+    background: rgba(255,255,255,0.05);
+    padding: 20px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+}
+h1,h2,h3 { color: white; }
+</style>
+""", unsafe_allow_html=True)
 
-df = load_data()
+def card(content):
+    st.markdown(f"<div class='card'>{content}</div>", unsafe_allow_html=True)
 
-# -----------------------------
-# MOCK FEATURES
-# -----------------------------
-np.random.seed(42)
+# ---------- TITLE ----------
+st.title("📦 Inventory Optimization")
 
-df["stock"] = np.random.randint(0, 500, len(df))
-df["demand"] = np.random.randint(10, 100, len(df))
-df["lead_time_days"] = np.random.randint(2, 15, len(df))
-df["holding_cost"] = np.random.uniform(1, 5, len(df))
+# ---------- KPI ----------
+i1, i2, i3 = st.columns(3)
+i1.metric("Stock Level", "2300")
+i2.metric("Low Stock", "12")
+i3.metric("Reorder", "5")
 
-# -----------------------------
-# ABC-XYZ CLASSIFICATION
-# -----------------------------
-def classify(row):
-    if row["demand"] > 80:
-        return "A-X"
-    elif row["demand"] > 50:
-        return "B-Y"
-    else:
-        return "C-Z"
+# ---------- DATA ----------
+data = pd.DataFrame({
+    "Product": ["A", "B", "C", "D"],
+    "Stock": [120, 80, 200, 60]
+})
 
-df["abc_xyz"] = df.apply(classify, axis=1)
+# ---------- CHART ----------
+card("<h3>📊 Inventory Levels</h3>")
 
-# -----------------------------
-# STOCKOUT RISK
-# -----------------------------
-df["stockout_risk"] = df["demand"] / (df["stock"] + 1)
-
-df["dead_stock"] = df["stock"] > 300
-
-# -----------------------------
-# SCORECARD
-# -----------------------------
-st.subheader("📊 Inventory Health Scorecard")
-
-fig = px.scatter(
-    df,
-    x="stock",
-    y="demand",
-    color="abc_xyz"
-)
+fig = px.bar(data, x="Product", y="Stock", color="Stock")
+fig.update_layout(template="plotly_dark")
 
 st.plotly_chart(fig, use_container_width=True)
 
-# -----------------------------
-# EOQ
-# -----------------------------
-st.subheader("⚙️ EOQ Calculator")
+# ---------- ALERT ----------
+low = data[data["Stock"] < 100]
 
-ordering_cost = st.number_input("Ordering Cost", value=50)
-holding_cost = st.number_input("Holding Cost", value=2)
-annual_demand = st.number_input("Annual Demand", value=1000)
+if not low.empty:
+    st.warning("⚠️ Low Stock Detected")
+    st.dataframe(low)
 
-eoq = np.sqrt((2 * annual_demand * ordering_cost) / holding_cost)
-safety_stock = df["demand"].mean() * 1.2
-
-st.metric("EOQ", f"{eoq:.0f}")
-st.metric("Safety Stock", f"{safety_stock:.0f}")
-
-# -----------------------------
-# REORDER ALERT (SAFE)
-# -----------------------------
-st.subheader("🚨 Reorder Alerts")
-
-reorder = df[df["stock"] < df["demand"] * 1.5]
-
-if len(reorder) > 0:
-    reorder = reorder.copy()
-    reorder["urgency_score"] = reorder["stockout_risk"] * 100
-    st.dataframe(reorder[["stock", "demand", "urgency_score"]].head(10))
-else:
-    st.info("No reorder alerts")
-
-# -----------------------------
-# OVERSTOCK
-# -----------------------------
-st.subheader("📉 Overstock Risk Panel")
-
-overstock = df[df["stock"] > 300]
-
-if len(overstock) > 0:
-    st.dataframe(overstock[["stock", "abc_xyz"]].head(10))
-else:
-    st.info("No overstock items")
-
-# -----------------------------
-# LEAD TIME
-# -----------------------------
-st.subheader("🚚 Supplier Lead Time Analysis")
-
-fig2 = px.histogram(df, x="lead_time_days")
-st.plotly_chart(fig2)
-
-# -----------------------------
-# EXPORT
-# -----------------------------
-st.subheader("📦 Export Inventory Report")
-
-buffer = io.StringIO()
-df.to_csv(buffer, index=False)
-
-st.download_button(
-    "⬇️ Download CSV",
-    buffer.getvalue(),
-    file_name="inventory_report.csv",
-    mime="text/csv"
-)
+# ---------- AI ----------
+card("<h3>🤖 Suggestion</h3><p>Reorder Product B & D</p>")

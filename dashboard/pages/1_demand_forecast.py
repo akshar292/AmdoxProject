@@ -1,136 +1,66 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
-from datetime import datetime
-import io
+import plotly.express as px
 
-# ---------------------------
-# PAGE CONFIG
-# ---------------------------
-st.title("📈 Demand Forecast Explorer")
+st.set_page_config(layout="wide")
 
-# ---------------------------
-# LOAD DATA (replace with ML output later)
-# ---------------------------
-@st.cache_data
-def load_data():
-    df = pd.read_csv("data/processed/time_series.csv")
-    df["date"] = pd.to_datetime(df["date"])
-    return df
+# ---------- GLOBAL CSS ----------
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #e2e8f0;
+}
+.card {
+    background: rgba(255,255,255,0.05);
+    padding: 20px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+}
+h1,h2,h3 { color: white; }
+</style>
+""", unsafe_allow_html=True)
 
-df = load_data()
+def card(content):
+    st.markdown(f"<div class='card'>{content}</div>", unsafe_allow_html=True)
 
-# ---------------------------
-# SIDEBAR FILTERS
-# ---------------------------
-st.sidebar.header("🔍 Filters")
+# ---------- TITLE ----------
+st.title("📈 Demand Forecast")
 
-start_date = st.sidebar.date_input("Start Date", df["date"].min())
-end_date = st.sidebar.date_input("End Date", df["date"].max())
+# ---------- DATA ----------
+df = pd.DataFrame({
+    "date": pd.date_range(start="2024-01-01", periods=30),
+    "count": np.random.randint(80, 200, 30)
+})
 
-sku = st.sidebar.text_input("Search SKU", "SKU-101")
+# ---------- FILTER ----------
+col1, col2 = st.columns(2)
+start = col1.date_input("Start Date", df["date"].min())
+end = col2.date_input("End Date", df["date"].max())
 
-filtered = df[(df["date"] >= pd.to_datetime(start_date)) &
-              (df["date"] <= pd.to_datetime(end_date))]
+df = df[(df["date"] >= pd.to_datetime(start)) & (df["date"] <= pd.to_datetime(end))]
 
-# ---------------------------
-# FAKE FORECAST (replace with LSTM output)
-# ---------------------------
-filtered["forecast"] = filtered["count"] * (1 + np.random.normal(0, 0.05, len(filtered)))
-filtered["upper"] = filtered["forecast"] * 1.1
-filtered["lower"] = filtered["forecast"] * 0.9
+# ---------- KPI ----------
+k1, k2, k3 = st.columns(3)
+k1.metric("Avg Demand", int(df["count"].mean()))
+k2.metric("Peak Demand", int(df["count"].max()))
+k3.metric("Growth", "+8%")
 
-# ---------------------------
-# FORECAST CHART
-# ---------------------------
-fig = go.Figure()
+# ---------- CHART ----------
+card("<h3>📊 Forecast Trend</h3>")
 
-fig.add_trace(go.Scatter(
-    x=filtered["date"],
-    y=filtered["count"],
-    mode="lines",
-    name="Actual"
-))
-
-fig.add_trace(go.Scatter(
-    x=filtered["date"],
-    y=filtered["forecast"],
-    mode="lines",
-    name="Forecast"
-))
-
-# Confidence band
-fig.add_trace(go.Scatter(
-    x=filtered["date"],
-    y=filtered["upper"],
-    fill=None,
-    mode="lines",
-    line=dict(color="lightgray"),
-    showlegend=False
-))
-
-fig.add_trace(go.Scatter(
-    x=filtered["date"],
-    y=filtered["lower"],
-    fill="tonexty",
-    mode="lines",
-    line=dict(color="lightgray"),
-    name="Confidence Interval"
-))
+fig = px.area(df, x="date", y="count")
+fig.update_layout(template="plotly_dark")
 
 st.plotly_chart(fig, use_container_width=True)
 
-# ---------------------------
-# WHAT-IF SIMULATOR
-# ---------------------------
+# ---------- WHAT IF ----------
 st.subheader("⚙️ What-If Simulator")
 
-price_factor = st.slider("Price Impact", 0.5, 1.5, 1.0)
-promo_flag = st.selectbox("Promotion", [0, 1])
-weather_factor = st.slider("Weather Impact", 0.8, 1.2, 1.0)
+price = st.slider("Price Impact", 0.5, 1.5, 1.0)
+promo = st.selectbox("Promotion", [0, 1])
 
-simulated = filtered.copy()
-simulated["what_if_demand"] = (
-    simulated["forecast"] *
-    price_factor *
-    weather_factor *
-    (1.2 if promo_flag == 1 else 1.0)
-)
+df["simulation"] = df["count"] * price * (1.2 if promo else 1)
 
-st.line_chart(simulated[["forecast", "what_if_demand"]])
-
-# ---------------------------
-# MAPE LEADERBOARD
-# ---------------------------
-st.subheader("🏆 Forecast Accuracy Leaderboard")
-
-leaderboard = pd.DataFrame({
-    "SKU": ["SKU-101", "SKU-102", "SKU-103"],
-    "Category": ["A", "B", "A"],
-    "MAPE": [6.2, 8.9, 11.3]
-}).sort_values("MAPE")
-
-st.dataframe(leaderboard)
-
-# ---------------------------
-# EXPORTS
-# ---------------------------
-
-st.subheader("📦 Export Tools")
-
-# Excel export
-excel_buffer = io.BytesIO()
-leaderboard.to_excel(excel_buffer, index=False)
-excel_buffer.seek(0)
-
-st.download_button(
-    "⬇️ Download Forecast Excel",
-    excel_buffer,
-    file_name="forecast_report.xlsx"
-)
-
-# PNG export (chart)
-fig.write_image("forecast.png")
-
-st.success("Chart saved as PNG (forecast.png)")
+st.line_chart(df[["count", "simulation"]])

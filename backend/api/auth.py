@@ -1,12 +1,13 @@
 from fastapi import Header, HTTPException
 import jwt
 
-API_KEY = "secret-api-key"
+API_KEY = "12345"
 
-def verify_api_key(x_api_key: str = Header(None)):
+def verify_api_key(x_api_key: str = Header(...)):
+    print("🔑 Received API Key:", x_api_key)  # 👈 debug
     if x_api_key != API_KEY:
         raise HTTPException(status_code=403, detail="Invalid API Key")
-    return True
+    return x_api_key
 
 
 def verify_jwt(authorization: str = Header(None)):
